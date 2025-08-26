@@ -1,0 +1,22 @@
+from flask import Flask, render_template, request
+import openai
+
+app = Flask(__name__)
+
+openai.api_key = "YOUR_OPENAI_API_KEY"
+
+@app.route("/", methods=["GET", "POST"])
+def home():
+    summary = ""
+    if request.method == "POST":
+        text = request.form["text"]
+        response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=f"Summarize this text:\n{text}",
+            max_tokens=150
+        )
+        summary = response.choices[0].text.strip()
+    return render_template("index.html", summary=summary)
+
+if __name__ == "__main__":
+    app.run(debug=True)
