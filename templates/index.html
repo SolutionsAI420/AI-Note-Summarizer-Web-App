@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Note Summarizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Note Summarizer</h1>
+        <form method="POST" id="summarizer-form">
+            <textarea name="text" rows="10" placeholder="Paste your notes here..."></textarea><br>
+            <select name="model" id="model">
+                <option value="Fast" {% if selected_model=='Fast' %}selected{% endif %}>Fast (t5-small)</option>
+                <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality (bart-large)</option>
+            </select><br>
+            <button type="submit">Summarize</button>
+        </form>
+
+        <div id="loading" style="display:none;">⏳ Generating summary...</div>
+
+        {% if summary %}
+            <div class="summary-card">
+                <h2>Summary:</h2>
+                <p>{{ summary }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const form = document.getElementById('summarizer-form');
+        const loading = document.getElementById('loading');
+        form.addEventListener('submit', () => {
+            loading.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
