@@ -17,6 +17,13 @@
             <li><a href="#features">Features</a></li>
             <li><a href="#how-to">How to Use</a></li>
             <li><a href="#about">About</a></li>
+            {% if current_user.is_authenticated %}
+        <li><a href="#summarizer">{{ current_user.id }}</a></li>
+        <li><a href="{{ url_for('logout') }}">Logout</a></li>
+    {% else %}
+        <li><a href="{{ url_for('login') }}">Login</a></li>
+        <li><a href="{{ url_for('register') }}">Register</a></li>
+    {% endif %}
         </ul>
     </div>
 </nav>
@@ -30,25 +37,34 @@
     </div>
 </section>
 
-<!-- Summarizer Form -->
 <section id="summarizer" class="summarizer-section">
-    <h2>Summarize any text in a click</h2>
-    <form method="POST" id="summarizer-form">
-        <textarea name="text" rows="8" placeholder="Paste your notes here..."></textarea>
-        <select name="model" id="model">
-            <option value="Fast" {% if selected_model=='Fast' %}selected{% endif %}>Fast (t5-small)</option>
-            <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality (bart-large)</option>
-        </select>
-        <button type="submit">Summarize</button>
-    </form>
-    <div id="loading" style="display:none;">⏳ Generating summary...</div>
-    {% if summary %}
-    <div class="summary-card">
-        <h3>Summary:</h3>
-        <p>{{ summary }}</p>
-    </div>
+    {% if current_user.is_authenticated %}
+        <h2>Summarize any text in a click</h2>
+        <form method="POST" id="summarizer-form">
+            <textarea name="text" rows="8" placeholder="Paste your notes here..."></textarea>
+            <select name="model" id="model">
+                <option value="Fast" {% if selected_model=='Fast' %}selected{% endif %}>Fast (t5-small)</option>
+                <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality (bart-large)</option>
+            </select>
+            <button type="submit">Summarize</button>
+        </form>
+        <div id="loading" style="display:none;">⏳ Generating summary...</div>
+        {% if summary %}
+        <div class="summary-card">
+            <h3>Summary:</h3>
+            <p>{{ summary }}</p>
+        </div>
+        {% endif %}
+    {% else %}
+        <h2>Summarize any text in a click</h2>
+        <div class="summary-card">
+            <h3>Please log in to use the summarizer.</h3>
+            <p>Don't have an account? <a href="{{ url_for('register') }}">Register for free</a> to start summarizing your notes!</p>
+            <a href="{{ url_for('login') }}" class="cta-button" style="margin-top: 20px;">Login</a>
+        </div>
     {% endif %}
 </section>
+
 
 <!-- Features Section -->
 <section id="features" class="features">
