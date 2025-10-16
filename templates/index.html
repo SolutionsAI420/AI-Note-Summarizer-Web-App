@@ -18,12 +18,12 @@
             <li><a href="#how-to">How to Use</a></li>
             <li><a href="#about">About</a></li>
             {% if current_user.is_authenticated %}
-        <li><a href="#summarizer">{{ current_user.id }}</a></li>
-        <li><a href="{{ url_for('logout') }}">Logout</a></li>
-    {% else %}
-        <li><a href="{{ url_for('login') }}">Login</a></li>
-        <li><a href="{{ url_for('register') }}">Register</a></li>
-    {% endif %}
+                <li><a href="#summarizer">{{ current_user.username }}</a></li>
+                <li><a href="{{ url_for('logout') }}">Logout</a></li>
+            {% else %}
+                <li><a href="{{ url_for('login') }}">Login</a></li>
+                <li><a href="{{ url_for('register') }}">Register</a></li>
+            {% endif %}
         </ul>
     </div>
 </nav>
@@ -37,23 +37,29 @@
     </div>
 </section>
 
+<!-- Summarizer Section -->
 <section id="summarizer" class="summarizer-section">
     {% if current_user.is_authenticated %}
-        <h2>Summarize any text in a click</h2>
-        <form method="POST" id="summarizer-form">
+        <h2>Summarize any text or PDF in a click</h2>
+        <form method="POST" id="summarizer-form" enctype="multipart/form-data">
             <textarea name="text" rows="8" placeholder="Paste your notes here..."></textarea>
+            <br><br>
+            <input type="file" name="file" accept=".pdf">
+            <br><small>Upload a PDF to summarize its content automatically</small>
+            <br><br>
             <select name="model" id="model">
                 <option value="Fast" {% if selected_model=='Fast' %}selected{% endif %}>Fast (t5-small)</option>
                 <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality (bart-large)</option>
             </select>
+            <br><br>
             <button type="submit">Summarize</button>
         </form>
         <div id="loading" style="display:none;">⏳ Generating summary...</div>
         {% if summary %}
-        <div class="summary-card">
-            <h3>Summary:</h3>
-            <p>{{ summary }}</p>
-        </div>
+            <div class="summary-card">
+                <h3>Summary:</h3>
+                <p>{{ summary }}</p>
+            </div>
         {% endif %}
     {% else %}
         <h2>Summarize any text in a click</h2>
@@ -64,7 +70,6 @@
         </div>
     {% endif %}
 </section>
-
 
 <!-- Features Section -->
 <section id="features" class="features">
@@ -94,8 +99,8 @@
     <h2>How to use AI Note Summarizer</h2>
     <div class="steps">
         <div class="step">
-            <h3>1. Add Text</h3>
-            <p>Type, paste, or upload your notes or documents into the input box.</p>
+            <h3>1. Add Text or PDF</h3>
+            <p>Type, paste, or upload your notes or PDF documents into the input box.</p>
         </div>
         <div class="step">
             <h3>2. Adjust Settings</h3>
