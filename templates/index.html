@@ -26,12 +26,10 @@
                 <li><a href="{{ url_for('login') }}">Login</a></li>
                 <li><a href="{{ url_for('register') }}">Register</a></li>
                 {% endif %}
+                <li>
+                    <button id="theme-toggle" class="theme-toggle">🌙</button>
+                </li>
             </ul>
-            <!-- Dark Mode Toggle -->
-            <li>
-                <button id="theme-toggle" class="theme-toggle">🌙</button>
-            </li>
-
         </div>
     </nav>
 
@@ -39,8 +37,7 @@
     <section class="hero">
         <div class="hero-text">
             <h1>Free AI Note Summarizer</h1>
-            <p>Condense your articles, notes, or reports instantly while keeping the context intact. Save time and
-                extract key insights efficiently.</p>
+            <p>Condense your notes, articles, or PDFs instantly while keeping full context. Save time and extract key insights efficiently.</p>
             <a href="#summarizer" class="cta-button">Summarize Now</a>
         </div>
     </section>
@@ -50,23 +47,37 @@
         {% if current_user.is_authenticated %}
         <h2>Summarize any text or PDF in a click</h2>
         <form method="POST" id="summarizer-form" enctype="multipart/form-data">
-            <textarea name="text" rows="8" placeholder="Paste your notes here..."></textarea>
+            <textarea name="text" rows="8" placeholder="Paste your notes here...">{{ request.form.text or '' }}</textarea>
             <br><br>
             <input type="file" name="file" accept=".pdf">
             <br><small>Upload a PDF to summarize its content automatically</small>
             <br><br>
+
+            <!-- Model selection -->
             <select name="model" id="model">
                 <option value="Fast" {% if selected_model=='Fast' %}selected{% endif %}>Fast (t5-small)</option>
-                <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality
-                    (bart-large)</option>
+                <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality (DistilBART / bart-large)</option>
             </select>
             <br><br>
-            <button type="submit">Summarize</button>
+
+            <!-- Language selection -->
+            <select name="target_lang" id="target_lang">
+                <option value="auto" selected>Auto-Detect / Keep Original</option>
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="es">Spanish</option>
+                <option value="mr">Marathi</option>
+            </select>
+            <br><br>
+
+            <button type="submit" class="cta-button">Summarize</button>
         </form>
+
         <div id="loading" style="display:none;">⏳ Generating summary...</div>
+
         {% if summary %}
         <div class="summary-card">
-            <h3>Summary:</h3>
+            <h3>Summary {% if detected_lang and detected_lang != 'en' %}({{ detected_lang | upper }}){% endif %}:</h3>
             <p>{{ summary }}</p>
         </div>
         {% endif %}
@@ -74,8 +85,7 @@
         <h2>Summarize any text in a click</h2>
         <div class="summary-card">
             <h3>Please log in to use the summarizer.</h3>
-            <p>Don't have an account? <a href="{{ url_for('register') }}">Register for free</a> to start summarizing
-                your notes!</p>
+            <p>Don't have an account? <a href="{{ url_for('register') }}">Register for free</a> to start summarizing your notes!</p>
             <a href="{{ url_for('login') }}" class="cta-button" style="margin-top: 20px;">Login</a>
         </div>
         {% endif %}
@@ -86,20 +96,20 @@
         <h2>Why choose our Summarizer?</h2>
         <div class="feature-grid">
             <div class="feature-card">
-                <h3>AI-powered</h3>
+                <h3>⚡ AI-powered</h3>
                 <p>Extract key points from any document in seconds.</p>
             </div>
             <div class="feature-card">
-                <h3>Versatile</h3>
+                <h3>🧾 Versatile</h3>
                 <p>Works with articles, notes, or reports of any length.</p>
             </div>
             <div class="feature-card">
-                <h3>Customizable</h3>
-                <p>Choose bullet points or paragraph style, adjust length.</p>
+                <h3>🎯 Customizable</h3>
+                <p>Choose summarization style, length, and output language.</p>
             </div>
             <div class="feature-card">
-                <h3>Flexible</h3>
-                <p>Summarize up to 600 words for free, upgrade for more.</p>
+                <h3>💡 Flexible</h3>
+                <p>Summarize up to 600 words for free — upgrade for more.</p>
             </div>
         </div>
     </section>
@@ -114,11 +124,11 @@
             </div>
             <div class="step">
                 <h3>2. Adjust Settings</h3>
-                <p>Choose the summarization model and style (bullet/paragraph).</p>
+                <p>Choose the summarization model, style, and target language.</p>
             </div>
             <div class="step">
                 <h3>3. Get Summary</h3>
-                <p>Hit “Summarize” and get your key insights instantly!</p>
+                <p>Click “Summarize” and get instant results!</p>
             </div>
         </div>
     </section>
@@ -130,43 +140,37 @@
             <div class="footer-links">
                 <a href="#features">Features</a> |
                 <a href="#how-to">How to Use</a> |
-                <a href="#about">About</a>
+                <a href="#about">About</a> |
+                <a href="#top">Back to Top ↑</a>
             </div>
         </div>
     </footer>
 
     <script>
+        // Show loading indicator
         const form = document.getElementById('summarizer-form');
         const loading = document.getElementById('loading');
-        form.addEventListener('submit', () => {
-            loading.style.display = 'block';
-        });
+        if (form) {
+            form.addEventListener('submit', () => {
+                loading.style.display = 'block';
+            });
+        }
 
         // Theme toggle functionality
         document.addEventListener('DOMContentLoaded', function () {
             const themeToggle = document.querySelector('.theme-toggle');
             const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-
-            // Check for saved theme preference or use OS preference
-            const currentTheme = localStorage.getItem('theme') ||
-                (prefersDarkScheme.matches ? 'dark' : 'light');
-
-            // Apply the theme
+            const currentTheme = localStorage.getItem('theme') || (prefersDarkScheme.matches ? 'dark' : 'light');
             document.documentElement.setAttribute('data-theme', currentTheme);
 
-            // Toggle theme when button is clicked
             themeToggle.addEventListener('click', function () {
                 const currentTheme = document.documentElement.getAttribute('data-theme');
                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
                 document.documentElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
             });
         });
-
-
     </script>
-
 
 </body>
 
