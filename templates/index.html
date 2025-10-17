@@ -60,6 +60,17 @@
             </select>
             <br><br>
 
+            <div class="summary-length-selector">
+                <label>Summary Length:</label>
+                <input type="radio" id="short" name="summary_length" value="short" {% if selected_length=='short' %}checked{% endif %}>
+                <label for="short">Short</label>
+                <input type="radio" id="medium" name="summary_length" value="medium" {% if selected_length=='medium' %}checked{% endif %}>
+                <label for="medium">Medium</label>
+                <input type="radio" id="detailed" name="summary_length" value="detailed" {% if selected_length=='detailed' %}checked{% endif %}>
+                <label for="detailed">Detailed</label>
+            </div>
+            <br>
+
             <!-- Language selection -->
             <select name="target_lang" id="target_lang">
                 <option value="auto" selected>Auto-Detect / Keep Original</option>

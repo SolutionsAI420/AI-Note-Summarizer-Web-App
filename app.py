@@ -96,6 +96,7 @@ def logout():
 def home():
     summary = ""
     selected_model = "High-Quality"
+    selected_length = "medium" # Default value
     detected_lang = "en"
 
     if request.method == "POST":
@@ -106,6 +107,7 @@ def home():
         text = request.form.get("text", "").strip()
         file = request.files.get("file")
         selected_model = request.form.get("model", "High-Quality")
+        selected_length = request.form.get("summary_length", "medium")
         target_lang = request.form.get("target_lang", "auto")
 
         # --- Extract text from PDF if uploaded ---
@@ -123,6 +125,13 @@ def home():
             flash("⚠️ Please provide text or upload a PDF file.")
         else:
             try:
+                # --- Set summary length parameters ---
+                length_config = {
+                    "short": (30, 80),
+                    "medium": (50, 150),
+                    "detailed": (100, 300)
+                }
+                min_len, max_len = length_config.get(selected_length, (50, 150))
                 # --- Detect input language ---
                 detected_lang = detect(text)
                 print(f"🌍 Detected language: {detected_lang}")
@@ -135,7 +144,7 @@ def home():
 
                 # --- Summarize ---
                 model = get_model(selected_model)
-                result = model(translated_text, max_length=150, min_length=30, do_sample=False)
+                result = model(translated_text, max_length=max_len, min_length=min_len, do_sample=False)
                 summary_english = result[0]['summary_text']
 
                 # --- Translate summary back ---
@@ -153,6 +162,7 @@ def home():
     return render_template("index.html",
                            summary=summary,
                            selected_model=selected_model,
+                           selected_length=selected_length,
                            detected_lang=detected_lang)
 
 # --- Run the App ---
