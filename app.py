@@ -1,7 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from transformers import pipeline
-from keybert import KeyBERT
-import spacy
 import os, re
 from collections import Counter
 import yake
@@ -75,58 +73,40 @@ def get_model(name):
 # ---------------------------
 # Lazy Loading NLP/Keyword Models (New)
 # ---------------------------
+
+
 @lru_cache(maxsize=1)
 def get_nlp_models():
-    """Load KeyBERT, Spacy, and SentenceTransformer on demand."""
-    print("⚙️ Loading NLP/Keyword models...")
-    return {
-        "kw_model": KeyBERT('all-MiniLM-L6-v2'),
-        "nlp": spacy.load("en_core_web_sm"),
-        "embedder": SentenceTransformer('all-MiniLM-L6-v2')
-    }
+    """Light version: only YAKE and regex-based keyword extractor."""
+    print("⚙️ Loading lightweight keyword model...")
+    return {"kw_model": yake.KeywordExtractor(top=20, n=3), "embedder": SentenceTransformer('all-MiniLM-L6-v2')}
 
-# ---------------------------
-# Hybrid Keyword Extraction (Copied from previous step)
-# ---------------------------
 def hybrid_extract_keywords(text, top_n=12):
-    """Combine KeyBERT (prioritizing 1-2 words), YAKE, and linguistic filtering."""
+    """Simplified hybrid keyword extractor using YAKE + frequency filtering."""
     nlp_models = get_nlp_models()
     kw_model = nlp_models['kw_model']
-    nlp = nlp_models['nlp']
 
+    # Basic cleaning
     text_clean = re.sub(r'\s+', ' ', text)
     cleaned = re.sub(r'[^a-zA-Z\s]', '', text_clean).lower().strip()
     if not cleaned:
         return []
 
     try:
-        kw_bert_short = [kw for kw, score in kw_model.extract_keywords(
-            cleaned, keyphrase_ngram_range=(1, 2), stop_words='english', top_n=15, use_mmr=True, diversity=0.7)]
-        kw_bert_long = [kw for kw, score in kw_model.extract_keywords(
-            cleaned, keyphrase_ngram_range=(3, 3), stop_words='english', top_n=5, use_mmr=True, diversity=0.8)]
-        kw_bert = kw_bert_short + [k for k in kw_bert_long if k not in kw_bert_short]
-    except Exception:
-        kw_bert = []
-
-    try:
-        kw_yake = [kw for kw, _ in yake.KeywordExtractor(top=15, n=3).extract_keywords(cleaned)]
+        kw_yake = [kw for kw, _ in kw_model.extract_keywords(cleaned)]
     except Exception:
         kw_yake = []
 
-    combined = list(dict.fromkeys(kw_bert + kw_yake))
-    doc = nlp(text)
-    noun_chunks = [chunk.text.lower() for chunk in doc.noun_chunks if len(chunk.text.split()) <= 3]
-    
-    filtered = [kw for kw in combined if any(p in kw for p in noun_chunks) and len(kw.split()) <= 3]
+    # Fallback: frequency-based keywords if YAKE fails
+    if not kw_yake:
+        words = re.findall(r'\b\w+\b', cleaned)
+        freq = Counter(words)
+        kw_yake = [w for w, _ in freq.most_common(top_n)]
 
-    if not filtered:
-        filtered = [kw for kw in kw_bert_short if len(kw.split()) <= 2][:top_n]
-        if not filtered:
-             filtered = combined[:top_n]
-
+    # Rank and filter
     freq = Counter(re.findall(r'\b\w+\b', cleaned))
     unique = []
-    for k in filtered:
+    for k in kw_yake:
         if not any((k in u and k != u) or (u in k and k != u) for u in unique):
             unique.append(k)
 
@@ -140,134 +120,120 @@ def hybrid_extract_keywords(text, top_n=12):
 # ---------------------------
 def create_humanlike_mindmap(text, summary, filename="static/mindmap.png"):
     """
-    Creates a human-like conceptual mind map with uniform edges.
+    Creates a conceptual mind map (light version, no spaCy).
     """
     nlp_models = get_nlp_models()
-    nlp = nlp_models['nlp']
     embedder = nlp_models['embedder']
-    
+
     if not text.strip():
         return None
 
-    doc = nlp(summary if summary else text)
-    source_text = summary if summary else text
+    source_text = text  # Use full text for better concepts
+    cleaned_text = re.sub(r'[^a-zA-Z\s]', ' ', source_text.lower())
 
-    # Extract meaningful phrases (NPs - Max 3 words for mind map clarity)
-    noun_phrases = [chunk.text.strip() for chunk in doc.noun_chunks if 
-                    1 <= len(chunk.text.split()) <= 3 and len(chunk.text) > 3] 
-    noun_phrases_clean = list(set([re.sub(r'[^a-zA-Z\s]', '', phrase.lower()).strip() for phrase in noun_phrases]))
-    noun_phrases_clean = [p for p in noun_phrases_clean if p] 
+    # --- Improved Noun Phrase Extraction (1-3 words) ---
+    words = cleaned_text.split()
+    noun_phrases_clean = []
+    for i in range(len(words)):
+        for length in range(1, min(4, len(words) - i + 1)):
+            phrase = " ".join(words[i:i+length])
+            if re.match(r'^[a-z]+(?: [a-z]+){0,2}$', phrase):
+                noun_phrases_clean.append(phrase)
+    noun_phrases_clean = list(set(noun_phrases_clean))[:20]  # Cap for perf
 
-    # Fallback/Clustering setup
-    if len(noun_phrases_clean) < 5:
-        words = [w.lower() for w in re.findall(r'\b[a-zA-Z]{3,}\b', source_text)]
-        filtered_words = [w for w in words if w not in nlp.Defaults.stop_words]
-        main_topic = max(Counter(filtered_words), key=Counter(filtered_words).get, default="Main Topic").title()
-        if len(noun_phrases_clean) < 3:
-            noun_phrases_clean = list(set(filtered_words))[:10]
-        n_clusters = max(1, min(5, len(noun_phrases_clean)))
+    # Fallbacks
+    if len(noun_phrases_clean) < 10:
+        words_all = [w for w in re.findall(r'\b[a-zA-Z]{3,}\b', source_text.lower())]
+        freq = Counter(words_all)
+        main_topic = max((w for w in freq if len(w) > 4), key=freq.get, default="Main Topic").title()
+        noun_phrases_clean = [w.title() for w in freq.most_common(15)]
+        n_clusters = max(1, min(5, len(noun_phrases_clean) // 2))
     else:
+        freq = Counter(re.findall(r'\b[a-zA-Z]{3,}\b', source_text.lower()))
+        main_topic = max(noun_phrases_clean, key=lambda p: sum(freq[w] for w in p.split()))
+        main_topic = main_topic.title()
         n_clusters = 5
 
-    if not noun_phrases_clean: return None
+    if len(noun_phrases_clean) < 2:
+        return None
 
     embeddings = embedder.encode(noun_phrases_clean)
-    
-    # Select main topic
-    noun_phrases_sorted = sorted(
-        [chunk.text.strip() for chunk in doc.noun_chunks if 1 <= len(chunk.text.split()) <= 3],
-        key=lambda x: source_text.lower().count(x.lower()),
-        reverse=True
-    )
-    main_topic = noun_phrases_sorted[0].title() if noun_phrases_sorted else "Main Concept"
 
     # Cluster phrases
     labels = AgglomerativeClustering(n_clusters=n_clusters).fit_predict(embeddings)
-
     clusters = {}
     for label, phrase, embedding in zip(labels, noun_phrases_clean, embeddings):
         clusters.setdefault(label, []).append((phrase, embedding))
 
-    # Compute frequency for detail ranking
+    # Frequency-based weighting from full text
     words_all = [w.lower() for w in re.findall(r'\b[a-zA-Z]{3,}\b', text)]
-    freq_all = Counter([w for w in words_all if w not in nlp.Defaults.stop_words])
+    freq_all = Counter(words_all)
 
     subtopics = []
     cluster_centroids = {label: np.mean([item[1] for item in items], axis=0) for label, items in clusters.items()}
 
     for label, group_items in clusters.items():
-        if len(group_items) == 0: continue
-        
+        if len(group_items) < 1:
+            continue
+
         phrases = [item[0] for item in group_items]
         embeddings_group = np.array([item[1] for item in group_items])
-        
+
         centroid_similarity = cosine_similarity(embeddings_group, cluster_centroids[label].reshape(1, -1)).flatten()
         subtopic_index = np.argmax(centroid_similarity)
-        subtopic = ' '.join(phrases[subtopic_index].split()[:3]) 
-        
+        subtopic = ' '.join(phrases[subtopic_index].split()[:3]).title()
+
         details_candidates = [p for i, p in enumerate(phrases) if i != subtopic_index]
         ranked_details = sorted(details_candidates,
-                                key=lambda x: sum(freq_all.get(w, 0) for w in re.findall(r'\b\w+\b', x)),
+                                key=lambda x: sum(freq_all.get(w, 0) for w in re.findall(r'\b\w+\b', x.lower())),
                                 reverse=True)
-        details = [' '.join(d.split()[:3]) for d in ranked_details[:3]] 
+        details = [d.title() for d in ranked_details[:3]]
 
-        if subtopic.lower() != main_topic.lower() and len(subtopic.split()) >= 1:
-            subtopics.append((subtopic.title(), [d.title() for d in details]))
+        if subtopic.lower() != main_topic.lower() and subtopic:
+            subtopics.append((subtopic, details))
 
-    # Build graph (Undirected for radial/spring layout)
-    G = nx.Graph() 
-    
-    # NODE SIZES:
-    G.add_node(main_topic, size=30000, color="#8ecae6") 
-    
-    # --- UNIFORM EDGE CONFIGURATION ---
-    UNIFORM_EDGE_WIDTH = 4 
-    UNIFORM_EDGE_COLOR = '#444444' 
+    # --- Mind Map Graph
+    G = nx.Graph()
+    G.add_node(main_topic, size=30000, color="#8ecae6")
 
-    for sub, details in subtopics:
-        G.add_node(sub, size=20000, color="#90be6d") 
-        G.add_edge(main_topic, sub) 
+    UNIFORM_EDGE_WIDTH = 4
+    UNIFORM_EDGE_COLOR = '#444444'
 
-        for det in details:
-            det_name = f"{det}"
-            G.add_node(det_name, size=10000, color="#f9c74f") 
-            G.add_edge(sub, det_name) 
+    for sub, details in subtopics[:5]:  # Limit subtopics
+        G.add_node(sub, size=20000, color="#90be6d")
+        G.add_edge(main_topic, sub, width=UNIFORM_EDGE_WIDTH, color=UNIFORM_EDGE_COLOR)
+        for det in details[:2]:  # Limit details per sub
+            G.add_node(det, size=10000, color="#f9c74f")
+            G.add_edge(sub, det, width=UNIFORM_EDGE_WIDTH, color=UNIFORM_EDGE_COLOR)
 
-    # --- Layout for Radial Mindmap Look ---
-    try:
-        pos = nx.kamada_kawai_layout(G)
-    except Exception as e:
-        print(f"Kamada-Kawai layout failed: {e}. Falling back to spring layout.")
-        pos = nx.spring_layout(G, k=1.0, iterations=100)
-        
-    # --- Drawing ---
-    plt.figure(figsize=(26, 20)) 
+    if len(G.nodes) > 1:
+        try:
+            pos = nx.kamada_kawai_layout(G)
+        except:
+            pos = nx.spring_layout(G, k=1.0, iterations=100, seed=42)
 
-    sizes = [G.nodes[n]['size'] for n in G.nodes]
-    colors = [G.nodes[n]['color'] for n in G.nodes]
-    
-    # Prepare labels: apply newline formatting for better spacing
-    labels = {}
-    for n in G.nodes:
-        if len(n) > 15 or len(n.split()) > 2:
-            labels[n] = n.replace(' ', '\n')
-        else:
-            labels[n] = n
-            
-    # Draw with uniform edge width and color
-    nx.draw(G, pos, with_labels=True, node_size=sizes, node_color=colors,
-            font_size=18, font_weight='bold', 
-            edge_color=UNIFORM_EDGE_COLOR, 
-            width=UNIFORM_EDGE_WIDTH,
-            alpha=0.9, labels=labels, arrows=False, node_shape='o')
+        plt.figure(figsize=(20, 16))
+        sizes = [G.nodes[n]['size'] for n in G.nodes]
+        colors = [G.nodes[n]['color'] for n in G.nodes]
 
-    plt.title(f"Concept Mind Map - {main_topic}", fontsize=24, fontweight="bold", pad=20)
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight', dpi=220)
-    plt.close()
-    return filename
+        labels = {}
+        for n in G.nodes:
+            short_n = n if len(n) <= 12 else n[:10] + '...'
+            labels[n] = short_n.replace(' ', '\n')
 
+        nx.draw(G, pos, with_labels=True, node_size=sizes, node_color=colors,
+                font_size=14, font_weight='bold',
+                edge_color=UNIFORM_EDGE_COLOR,
+                width=UNIFORM_EDGE_WIDTH,
+                alpha=0.9, labels=labels, arrows=False, node_shape='o')
+
+        plt.title(f"Concept Mind Map - {main_topic}", fontsize=20, fontweight="bold", pad=20)
+        plt.axis("off")
+        plt.tight_layout()
+        plt.savefig(filename, bbox_inches='tight', dpi=150)  # Lower DPI for speed
+        plt.close()
+        return filename
+    return None
 
 # ---------------------------
 # Authentication Routes
@@ -327,14 +293,17 @@ def home():
             flash('Please log in to use the summarizer.')
             return redirect(url_for('login'))
 
+        action = request.form.get("action", "summarize")  # Default to summarize
+
         text_input = request.form.get("text", "").strip()
         file = request.files.get("file")
         selected_model = request.form.get("model", "High-Quality")
         target_lang = request.form.get("target_lang", "auto")
 
-        # Clear old map
-        if os.path.exists("static/mindmap.png"):
-            os.remove("static/mindmap.png")
+        # Clear old map only if mindmap action
+        if action == "mindmap":
+            if os.path.exists("static/mindmap.png"):
+                os.remove("static/mindmap.png")
 
         # --- Extract text from PDF if uploaded ---
         if file and allowed_file(file.filename):
@@ -361,20 +330,34 @@ def home():
                 else:
                     translated_text = text_input
 
-                # --- 3. Summarize (on English text) ---
-                model = get_model(selected_model)
-                result = model(translated_text, max_length=150, min_length=30, do_sample=False)
-                summary_english = result[0]['summary_text']
-                
-                # --- 4. EXTRACT KEYWORDS & CREATE MIND MAP (on English text) ---
-                if len(translated_text) > 100: # Only run resource-intensive tasks on substantial text
+                summary_english = ""
+                keywords = []
+                mindmap_path = None
+
+                # --- 3. Summarize (on English text) only if action requires it ---
+                if action == "summarize":
+                    model = get_model(selected_model)
+                    input_text = translated_text
+                    if "t5" in model.model.config.name_or_path.lower():
+                        input_text = f"summarize: {translated_text}"
+                    if len(translated_text.split()) < 10:
+                        summary_english = translated_text[:150] + "..."
+                    else:
+                        result = model(input_text, max_length=150, min_length=30, do_sample=False)
+                        summary_english = result[0]['summary_text']
+
+                # --- 4. EXTRACT KEYWORDS only if action requires it ---
+                if action == "keywords":
                     keywords = hybrid_extract_keywords(translated_text)
+                
+                # --- 5. CREATE MIND MAP only if action requires it ---
+                if action == "mindmap":
                     mindmap_path = create_humanlike_mindmap(translated_text, summary_english)
 
-                # --- 5. Translate summary back ---
+                # --- 6. Translate summary back ---
                 final_target_lang = target_lang if target_lang != "auto" else detected_lang
                 
-                if final_target_lang != "en":
+                if final_target_lang != "en" and summary_english:
                     summary = GoogleTranslator(source='en', target=final_target_lang).translate(summary_english)
                     detected_lang = final_target_lang
                 else:
@@ -390,11 +373,11 @@ def home():
                             mindmap_path=mindmap_path,
                             selected_model=selected_model,
                             detected_lang=detected_lang)
-
+    
 # ---------------------------
 # Run the App
 # ---------------------------
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=False, use_reloader=False, threaded=False)
+    app.run(use_reloader=True, threaded=True, port=5000)
