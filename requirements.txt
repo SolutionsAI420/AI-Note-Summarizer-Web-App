@@ -1,15 +1,23 @@
-flask
+# Flask and extensions
+Flask
+Flask-Login
+Flask-SQLAlchemy
+psycopg2-binary
+Werkzeug
+
+# AI & Summarization (Hugging Face)
 transformers
 torch
-deep-translator 
+sentence-transformers
+
+# Keyword & NLP
+yake
 langdetect
-SQLAlchemy
-flask-login 
-flask-sqlalchemy 
-transformers 
-werkzeug 
-psycopg2-binary 
-python-dotenv
-googletrans==4.0.0-rc1 
-langdetect
+deep-translator
+scikit-learn
+numpy
+
+# Mindmap & PDF
+networkx
+matplotlib
 PyPDF2
