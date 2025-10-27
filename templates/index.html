@@ -47,25 +47,28 @@
         {% if current_user.is_authenticated %}
         <h2>Summarize any text or PDF in a click</h2>
         <form method="POST" id="summarizer-form" enctype="multipart/form-data">
-            <textarea name="text" rows="8" placeholder="Paste your notes here..."></textarea>
-            <br><br>
-            <input type="file" name="file" accept=".pdf">
-            <br><small>Upload a PDF to summarize its content automatically</small>
-            <br><br>
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
+            <!-- Textarea for notes -->
+            <label for="text">Paste your notes here:</label><br>
+            <textarea id="text" name="text" rows="8" placeholder="Write or paste your text..."></textarea>
+            <br><br>
+
+            <!-- PDF Upload -->
+            <label for="file">Upload a PDF to summarize its content automatically</label><br>
+            <input type="file" id="file" name="file" accept=".pdf">
+            <br><br>
+
+            <!-- Model Selection -->
+            <label for="model">Select Model</label><br>
             <select name="model" id="model">
                 <option value="Fast" {% if selected_model=='Fast' %}selected{% endif %}>Fast (t5-small)</option>
                 <option value="High-Quality" {% if selected_model=='High-Quality' %}selected{% endif %}>High-Quality
                     (bart-large)</option>
             </select>
             <br><br>
-<<<<<<< Updated upstream
-            <button type="submit">Summarize</button>
-=======
 
+            <!-- Language Selection -->
+            <label for="target_lang">Select a Language</label><br>
             <select name="target_lang" id="target_lang">
                 <option value="auto" selected>Auto-Detect / Keep Original</option>
                 <option value="en">English</option>
@@ -75,17 +78,37 @@
             </select>
             <br><br>
 
-            <button type="submit" class="cta-button">Summarize</button>
->>>>>>> Stashed changes
+            <input type="hidden" name="action" id="action" value="summarize">
+
+            <div class="action-buttons" style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button type="submit" class="cta-button"
+                    onclick="document.getElementById('action').value='summarize'; this.form.submit(); return false;"
+                    style="background-color: #4CAF50;">Summarize</button>
+                <button type="submit" class="cta-button"
+                    onclick="document.getElementById('action').value='keywords'; this.form.submit(); return false;"
+                    style="background-color: #2196F3;">Extract Keywords</button>
+                <button type="submit" class="cta-button"
+                    onclick="document.getElementById('action').value='mindmap'; this.form.submit(); return false;"
+                    style="background-color: #FF9800;">Generate Mindmap</button>
+            </div>
         </form>
+
         <div id="loading" style="display:none;">⏳ Generating summary...</div>
+
         {% if summary %}
         <div class="summary-card">
             <h3>Summary:</h3>
-            <p>{{ summary }}</p>
+            <div style="position: relative; display: flex; align-items: center;">
+                <textarea id="summary" rows="8" readonly style="flex:1; resize:none;">{{ summary }}</textarea>
+                <button type="button" id="copySummaryBtn"
+                    style="margin-left:10px; padding:8px 12px; cursor:pointer; background:#4CAF50; color:white; border:none; border-radius:5px;">
+                    Copy
+                </button>
+            </div>
+            <small id="copyMsg" style="color:green; display:none;">Copied to clipboard!</small>
         </div>
         {% endif %}
-        
+
         {% if keywords %}
         <div class="keywords-card summary-card">
             <h3>Extracted Keywords (English):</h3>
@@ -100,7 +123,8 @@
         {% if mindmap_path %}
         <div class="mindmap-card summary-card">
             <h3>Concept Mind Map (English):</h3>
-            <img src="{{ url_for('static', filename='mindmap.png') }}" alt="Concept Mindmap" style="max-width:100%; height:auto; border-radius: 8px;">
+            <img src="{{ url_for('static', filename='mindmap.png') }}" alt="Concept Mindmap"
+                style="max-width:100%; height:auto; border-radius: 8px;">
         </div>
         {% endif %}
         {% else %}
@@ -191,6 +215,24 @@
 
                 document.documentElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
+            });
+        });
+
+        document.getElementById('copySummaryBtn')?.addEventListener('click', function () {
+            const summaryBox = document.getElementById('summary');
+
+            // Select text
+            summaryBox.select();
+            summaryBox.setSelectionRange(0, 99999); // for mobile
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(summaryBox.value).then(() => {
+                const msg = document.getElementById('copyMsg');
+                msg.style.display = 'inline';
+                setTimeout(() => { msg.style.display = 'none'; }, 2000);
+            }).catch(err => {
+                alert('Failed to copy summary!');
+                console.error(err);
             });
         });
 
