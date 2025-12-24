@@ -285,6 +285,7 @@ def home():
     keywords = []
     mindmap_path = None
     selected_model = "High-Quality"
+    selected_length = "medium" # Default value
     detected_lang = "en"
     text_input = ""
 
@@ -298,6 +299,7 @@ def home():
         text_input = request.form.get("text", "").strip()
         file = request.files.get("file")
         selected_model = request.form.get("model", "High-Quality")
+        selected_length = request.form.get("summary_length", "medium")
         target_lang = request.form.get("target_lang", "auto")
 
         # Clear old map only if mindmap action
