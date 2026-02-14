@@ -533,3 +533,27 @@ button:hover {
       padding: 20px;
   }
 }
+
+
+/* ------------------ Character Counter Styles ------------------ */
+#charCount {
+  display: block; /* Ensures it takes its own line below the textarea */
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--text-color);
+  margin-top: 5px;
+  margin-right: 5%; /* Align with the textarea's right edge */
+  opacity: 0.8;
+}
+
+#charCount.limit-exceeded {
+  color: #dc3545; /* Bootstrap red for error */
+  font-weight: 600;
+  animation: pulse-red 0.5s ease-in-out forwards;
+}
+
+@keyframes pulse-red {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; color: #ff0000; }
+  100% { transform: scale(1); opacity: 1; color: #dc3545; }
+}

@@ -50,7 +50,8 @@
 
             <!-- Textarea for notes -->
             <label for="text">Paste your notes here:</label><br>
-            <textarea id="text" name="text" rows="8" placeholder="Write or paste your text..."></textarea>
+            <textarea id="text" name="text" rows="8" placeholder="Write or paste your text..." maxlength="5000"></textarea>
+            <span id="charCount">0/5000</span>
             <br><br>
 
             <!-- PDF Upload -->
@@ -238,7 +239,34 @@
 
 
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const contentInput = document.getElementById('text');
+            const charCountSpan = document.getElementById('charCount');
+            const MAX_CHARS = 5000; // This should match the maxlength attribute of the textarea
 
+            // Ensure elements exist before adding listeners or manipulating
+            if (contentInput && charCountSpan) {
+                function updateCharCounter() {
+                    const currentLength = contentInput.value.length;
+                    charCountSpan.textContent = `${currentLength}/${MAX_CHARS}`;
+
+                    // Add/remove a class based on whether the limit is reached
+                    if (currentLength >= MAX_CHARS) {
+                        charCountSpan.classList.add('limit-exceeded');
+                    } else {
+                        charCountSpan.classList.remove('limit-exceeded');
+                    }
+                }
+
+                // Attach event listener for real-time updates
+                contentInput.addEventListener('input', updateCharCounter);
+
+                // Initial call to set the counter value on page load (in case of pre-filled text)
+                updateCharCounter();
+            }
+        });
+    </script>
 
 </body>
 
